@@ -68,34 +68,49 @@ struct BrowserView: View {
 }
 
 struct BrowserContentView: View {
-    @State private var isLoading = false
+    @State private var isLoading = true
     @State private var error: Error?
     @Binding var showBrowser: Bool
     
-    private let webView = WebView(
-        url: URL(string: "https://www.google.com")!,
-        isLoading: .constant(false),
-        error: .constant(nil)
-    )
+    private let webView: WebView
+    
+    init(showBrowser: Binding<Bool>) {
+        _showBrowser = showBrowser
+        let isLoadingState = State(initialValue: true)
+        let errorState = State<Error?>(initialValue: nil)
+        
+        self.webView = WebView(
+            url: URL(string: "https://www.google.com")!,
+            isLoading: .init(get: { isLoadingState.wrappedValue }, set: { isLoadingState.wrappedValue = $0 }),
+            error: .init(get: { errorState.wrappedValue }, set: { errorState.wrappedValue = $0 })
+        )
+
+        _isLoading = isLoadingState
+        _error = errorState
+    }
 
     var body: some View {
         VStack {
-            if isLoading {
-                ProgressView()
-            } else if let error = error {
-                VStack {
-                    Text("Не вдалося завантажити")
-                    Button("Повторити") {
-                        webView.webView.reload()
+            webView
+                .overlay(
+                    Group {
+                        if isLoading {
+                            ProgressView("Завантаження...")
+                        } else if let error = error {
+                            VStack(spacing: 10) {
+                                Text("Не вдалося завантажити")
+                                    .font(.headline)
+                                Text(error.localizedDescription)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Button("Повторити") {
+                                    self.webView.webView.reload()
+                                }
+                                .padding(.top)
+                            }
+                        }
                     }
-                }
-            } else {
-                 WebView(
-                    url: URL(string: "https://www.google.com")!,
-                    isLoading: $isLoading,
-                    error: $error
                 )
-            }
 
             HStack {
                 Button(action: { webView.webView.goBack() }) { Image(systemName: "chevron.left") }
@@ -103,13 +118,16 @@ struct BrowserContentView: View {
                 Button(action: { webView.webView.goForward() }) { Image(systemName: "chevron.right") }
                 Spacer()
                 Button(action: { webView.webView.reload() }) { Image(systemName: "arrow.clockwise") }
-                Spacer()
-                Button("Закрити") { showBrowser = false }
             }
             .padding()
             .background(Color(.systemGray6))
         }
         .navigationTitle("Google")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Закрити") { showBrowser = false }
+            }
+        }
     }
 }
